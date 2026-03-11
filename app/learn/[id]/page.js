@@ -34,12 +34,22 @@ export default function LearnPage() {
     load()
   }, [id])
 
-async function handleGrade(grade) {
+  async function handleGrade(grade) {
     const earned = grade === 'easy' ? 20 : grade === 'good' ? 15 : grade === 'hard' ? 10 : 5
     const newXp = xp + earned
     setXp(newXp)
 
     const { data: { user } } = await supabase.auth.getUser()
+
+    // Save card progress
+    await supabase.from('progress').upsert({
+      user_id: user.id,
+      module_id: id,
+      card_id: cards[current].id,
+      status: 'done',
+      ease: grade,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,card_id' })
 
     // Save to xp_log
     await supabase.from('xp_log').insert({
@@ -49,7 +59,6 @@ async function handleGrade(grade) {
     })
 
     if (current + 1 >= cards.length) {
-      // Update total XP on profile
       await supabase.rpc('increment_xp', { user_id_input: user.id, amount_input: newXp })
       setDone(true)
     } else {
@@ -79,7 +88,6 @@ async function handleGrade(grade) {
 
   return (
     <div style={{ minHeight:'100vh', background:'#080808', fontFamily:'DM Sans,sans-serif', color:'#f5f5f5' }}>
-      {/* NAV */}
       <nav style={{ position:'sticky', top:0, zIndex:100, height:'56px', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 24px', background:'rgba(8,8,8,0.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid #2c2c2c' }}>
         <button onClick={() => router.push('/dashboard')} style={{ background:'transparent', border:'1px solid #2c2c2c', color:'#888', borderRadius:'8px', padding:'6px 14px', fontSize:'13px', cursor:'pointer', fontFamily:'DM Sans,sans-serif' }}>
           ← Back
@@ -89,7 +97,6 @@ async function handleGrade(grade) {
       </nav>
 
       <div style={{ padding:'40px 24px', maxWidth:'600px', margin:'0 auto' }}>
-        {/* PROGRESS */}
         <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'32px' }}>
           <div style={{ flex:1, height:'6px', background:'#1f1f1f', borderRadius:'99px', overflow:'hidden' }}>
             <div style={{ width:`${((current) / cards.length) * 100}%`, height:'100%', background:'linear-gradient(90deg,#f5c200,#ffd93d)', borderRadius:'99px', transition:'width 0.3s' }}></div>
@@ -97,7 +104,6 @@ async function handleGrade(grade) {
           <div style={{ fontSize:'12px', color:'#888', flexShrink:0 }}>{current + 1} / {cards.length}</div>
         </div>
 
-        {/* CARD */}
         <div onClick={() => setFlipped(!flipped)} style={{
           width:'100%', minHeight:'280px', borderRadius:'24px', cursor:'pointer',
           background: flipped ? 'rgba(245,194,0,0.08)' : '#171717',
@@ -108,7 +114,7 @@ async function handleGrade(grade) {
           <div style={{ fontSize:'11px', fontWeight:600, letterSpacing:'2px', color: flipped ? '#f5c200' : '#888', marginBottom:'16px', textTransform:'uppercase' }}>
             {flipped ? 'Answer' : 'Question'}
           </div>
-          <div style={{ fontSize:'20px', fontWeight: flipped ? 400 : 700, lineHeight:1.5, color: flipped ? '#f5f5f5' : '#f5f5f5' }}>
+          <div style={{ fontSize:'20px', fontWeight: flipped ? 400 : 700, lineHeight:1.5 }}>
             {flipped ? card.back : card.front}
           </div>
           {!flipped && (
@@ -116,7 +122,6 @@ async function handleGrade(grade) {
           )}
         </div>
 
-        {/* GRADE BUTTONS */}
         {flipped && (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'10px' }}>
             {[
